@@ -357,8 +357,6 @@ static inline int dhd_write_macaddr(struct ether_addr *mac) { return 0; }
 #ifdef ARGOS_CPU_SCHEDULER
 extern int argos_task_affinity_setup_label(struct task_struct *p, const char *label,
 	struct cpumask * affinity_cpu_mask, struct cpumask * default_cpu_mask);
-extern struct cpumask hmp_slow_cpu_mask;
-extern struct cpumask hmp_fast_cpu_mask;
 extern void set_cpucore_for_interrupt(cpumask_var_t default_cpu_mask,
 	cpumask_var_t affinity_cpu_mask);
 #endif /* ARGOS_CPU_SCHEDULER */
@@ -4795,7 +4793,6 @@ dhd_dpc_thread(void *data)
 			free_cpumask_var(dhd->pub.default_cpu_mask);
 			dhd->pub.affinity_isdpc = FALSE;
 		} else {
-			cpumask_copy(dhd->pub.default_cpu_mask, &hmp_slow_cpu_mask);
 			cpumask_or(dhd->pub.dpc_affinity_cpu_mask,
 				dhd->pub.dpc_affinity_cpu_mask, cpumask_of(DPC_CPUCORE));
 
@@ -7068,7 +7065,6 @@ dhd_attach(osl_t *osh, struct dhd_bus *bus, uint bus_hdrlen)
 				free_cpumask_var(dhd->pub.default_cpu_mask);
 				dhd->pub.affinity_isdpc = FALSE;
 			} else {
-				cpumask_copy(dhd->pub.default_cpu_mask, &hmp_slow_cpu_mask);
 				cpumask_or(dhd->pub.dpc_affinity_cpu_mask,
 					dhd->pub.dpc_affinity_cpu_mask,
 					cpumask_of(TASKLET_CPUCORE));
