@@ -2261,7 +2261,8 @@ static int exynos_thermal_pm_notifier(struct notifier_block *notifier,
 	case PM_POST_SUSPEND:
 		list_for_each_entry(pos, &thermal_tz_list, node) {
 			if (!pos->polling_delay) {
-				start_poll_queue(pos, polling_interval);
+				mod_delayed_work(system_freezable_wq, &pos->poll_queue,
+					msecs_to_jiffies(polling_interval));
 			}
 		}
 		break;
