@@ -31,11 +31,6 @@ enum hpgov_event {
 struct hpgov_attrib {
 	struct kobj_attribute	enabled;
 	struct kobj_attribute	dual_change_ms;
-#if defined(CONFIG_HP_EVENT_HMP_SYSTEM_LOAD)
-	struct kobj_attribute	to_quad_ratio;
-	struct kobj_attribute	to_dual_ratio;
-	struct kobj_attribute	lit_mult_ratio;
-#endif
 
 	struct attribute_group	attrib_group;
 };
@@ -68,11 +63,6 @@ struct {
 
 	int				boost_cnt;
 
-#if defined(CONFIG_HP_EVENT_HMP_SYSTEM_LOAD)
-	int				*to_quad_ratio;
-	int				*to_dual_ratio;
-	int				*lit_mult_ratio;
-#endif
 } exynos_hpgov;
 
 static struct pm_qos_request hpgov_max_pm_qos;
@@ -391,53 +381,6 @@ static int exynos_hpgov_set_dual_change_ms(int val)
 	return 0;
 }
 
-#if defined(CONFIG_HP_EVENT_HMP_SYSTEM_LOAD)
-/* Currently max value of to_quad_ratio is 100. */
-/* TODO: Change max value for ratio to 1024 (permille) */
-static int exynos_hpgov_set_to_quad_ratio(int val)
-{
-	if ((val > 100) || (val < 0))
-		return -EINVAL;
-
-	*exynos_hpgov.to_quad_ratio = val;
-	hp_sysload_param_calc();
-
-	/* XXX: Does not required hp_event_update_rq_load()? */
-
-	return 0;
-}
-
-/* Currently max value of to_dual_ratio is 100. */
-/* TODO: Change max value for ratio to 1024 (permille) */
-static int exynos_hpgov_set_to_dual_ratio(int val)
-{
-	if ((val > 100) || (val < 0))
-		return -EINVAL;
-
-	*exynos_hpgov.to_dual_ratio = val;
-	hp_sysload_param_calc();
-
-	/* XXX: Does not required hp_event_update_rq_load()? */
-
-	return 0;
-}
-
-/* Currently max value of lit_mult_ratio is 200. */
-/* TODO: Change max value for ratio to 2048 (permille) */
-static int exynos_hpgov_set_lit_mult_ratio(int val)
-{
-	if ((val > 200) || (val < 0))
-		return -EINVAL;
-
-	*exynos_hpgov.lit_mult_ratio = val;
-	hp_sysload_param_calc();
-
-	/* XXX: Does not required hp_event_update_rq_load()? */
-
-	return 0;
-}
-#endif
-
 #define HPGOV_PARAM(_name, _param) \
 static ssize_t exynos_hpgov_attr_##_name##_show(struct kobject *kobj, \
 			struct kobj_attribute *attr, char *buf) \
@@ -477,11 +420,6 @@ static ssize_t exynos_hpgov_attr_##_name##_store(struct kobject *kobj, \
 
 HPGOV_PARAM(enabled, exynos_hpgov.enabled);
 HPGOV_PARAM(dual_change_ms, exynos_hpgov.dual_change_ms);
-#if defined(CONFIG_HP_EVENT_HMP_SYSTEM_LOAD)
-HPGOV_PARAM(to_quad_ratio, *exynos_hpgov.to_quad_ratio);
-HPGOV_PARAM(to_dual_ratio, *exynos_hpgov.to_dual_ratio);
-HPGOV_PARAM(lit_mult_ratio, *exynos_hpgov.lit_mult_ratio);
-#endif
 
 static void hpgov_boot_enable(struct work_struct *work);
 static DECLARE_DELAYED_WORK(hpgov_boot_work, hpgov_boot_enable);
@@ -517,17 +455,6 @@ static int __init exynos_hpgov_init(void)
 
 	HPGOV_RW_ATTRIB(attr_count - (i_attr--), enabled);
 	HPGOV_RW_ATTRIB(attr_count - (i_attr--), dual_change_ms);
-#if defined(CONFIG_HP_EVENT_HMP_SYSTEM_LOAD)
-	HPGOV_RW_ATTRIB(attr_count - (i_attr--), to_quad_ratio);
-	HPGOV_RW_ATTRIB(attr_count - (i_attr--), to_dual_ratio);
-	HPGOV_RW_ATTRIB(attr_count - (i_attr--), lit_mult_ratio);
-#endif
-
-#if defined(CONFIG_HP_EVENT_HMP_SYSTEM_LOAD)
-	exynos_hpgov.to_quad_ratio = &hp_sysload_to_quad_ratio;
-	exynos_hpgov.to_dual_ratio = &hp_sysload_to_dual_ratio;
-	exynos_hpgov.lit_mult_ratio = &hp_little_multiplier_ratio;
-#endif
 
 	exynos_hpgov.attrib.attrib_group.name = "governor";
 	ret = sysfs_create_group(exynos_cpu_hotplug_kobj(), &exynos_hpgov.attrib.attrib_group);
