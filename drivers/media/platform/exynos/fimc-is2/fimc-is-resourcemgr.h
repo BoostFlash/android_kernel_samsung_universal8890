@@ -49,8 +49,6 @@ struct fimc_is_dvfs_ctrl {
 	int cur_cam_qos;
 	int cur_i2c_qos;
 	int cur_disp_qos;
-	int cur_hpg_qos;
-	int cur_hmp_bst;
 	u32 dvfs_table_idx;
 	u32 dvfs_table_max;
 	ulong state;

@@ -68,8 +68,6 @@ int fimc_is_dvfs_init(struct fimc_is_resourcemgr *resourcemgr)
 	dvfs_ctrl->cur_cam_qos = 0;
 	dvfs_ctrl->cur_i2c_qos = 0;
 	dvfs_ctrl->cur_disp_qos = 0;
-	dvfs_ctrl->cur_hpg_qos = 0;
-	dvfs_ctrl->cur_hmp_bst = 0;
 
 	/* init spin_lock for clock gating */
 	mutex_init(&dvfs_ctrl->lock);
@@ -311,7 +309,7 @@ int fimc_is_get_qos(struct fimc_is_core *core, u32 type, u32 scenario_id)
 int fimc_is_set_dvfs(struct fimc_is_device_ischain *device, u32 scenario_id)
 {
 	int ret = 0;
-	int int_qos, mif_qos, i2c_qos, cam_qos, disp_qos, hpg_qos;
+	int int_qos, mif_qos, i2c_qos, cam_qos, disp_qos;
 	struct fimc_is_core *core;
 	struct fimc_is_resourcemgr *resourcemgr;
 	struct fimc_is_dvfs_ctrl *dvfs_ctrl;
@@ -330,7 +328,6 @@ int fimc_is_set_dvfs(struct fimc_is_device_ischain *device, u32 scenario_id)
 	i2c_qos = fimc_is_get_qos(core, FIMC_IS_DVFS_I2C, scenario_id);
 	cam_qos = fimc_is_get_qos(core, FIMC_IS_DVFS_CAM, scenario_id);
 	disp_qos = fimc_is_get_qos(core, FIMC_IS_DVFS_DISP, scenario_id);
-	hpg_qos = fimc_is_get_qos(core, FIMC_IS_DVFS_HPG, scenario_id);
 
 	if ((int_qos < 0) || (mif_qos < 0) || (i2c_qos < 0)
 	|| (cam_qos < 0) || (disp_qos < 0)) {
@@ -371,28 +368,9 @@ int fimc_is_set_dvfs(struct fimc_is_device_ischain *device, u32 scenario_id)
 		dvfs_ctrl->cur_cam_qos = cam_qos;
 	}
 
-	/* hpg_qos : number of minimum online CPU */
-	if (hpg_qos && dvfs_ctrl->cur_hpg_qos != hpg_qos) {
-		pm_qos_update_request(&exynos_isp_qos_hpg, hpg_qos);
-		dvfs_ctrl->cur_hpg_qos = hpg_qos;
-
-		/* for migration to big core */
-		if (hpg_qos > 6) {
-			if (!dvfs_ctrl->cur_hmp_bst) {
-				set_hmp_boost(1);
-				dvfs_ctrl->cur_hmp_bst = 1;
-			}
-		} else {
-			if (dvfs_ctrl->cur_hmp_bst) {
-				set_hmp_boost(0);
-				dvfs_ctrl->cur_hmp_bst = 0;
-			}
-		}
-	}
-
-	info("[RSC:%d]: New QoS [INT(%d), MIF(%d), CAM(%d), DISP(%d), I2C(%d), HPG(%d, %d)]\n",
+	info("[RSC:%d]: New QoS [INT(%d), MIF(%d), CAM(%d), DISP(%d), I2C(%d)]\n",
 			device->instance, int_qos, mif_qos,
-			cam_qos, disp_qos, i2c_qos, hpg_qos, dvfs_ctrl->cur_hmp_bst);
+			cam_qos, disp_qos, i2c_qos);
 exit:
 	return ret;
 }
