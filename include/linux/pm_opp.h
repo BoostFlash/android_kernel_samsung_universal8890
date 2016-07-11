@@ -22,11 +22,19 @@ struct dev_pm_opp {
 
 	bool available;
 	bool dynamic;
+	bool turbo;
 	unsigned long rate;
+
 	unsigned long u_volt;
+	unsigned long u_volt_min;
+	unsigned long u_volt_max;
+	unsigned long u_amp;
+	unsigned long clock_latency_ns;
 
 	struct device_opp *dev_opp;
 	struct rcu_head rcu_head;
+
+	struct device_node *np;
 };
 
 struct device;
@@ -34,10 +42,26 @@ struct device;
 struct device_opp {
 	struct list_head node;
 
-	struct device *dev;
 	struct srcu_notifier_head srcu_head;
 	struct rcu_head rcu_head;
+	struct list_head dev_list;
 	struct list_head opp_list;
+
+	struct device_node *np;
+	unsigned long clock_latency_ns_max;
+
+	/* For backward compatibility with v1 bindings */
+	unsigned int voltage_tolerance_v1;
+
+	bool shared_opp;
+	struct dev_pm_opp *suspend_opp;
+
+	unsigned int *supported_hw;
+	unsigned int supported_hw_count;
+	const char *prop_name;
+	struct clk *clk;
+	struct regulator *regulator;
+
 };
 
 enum dev_pm_opp_event {
@@ -45,13 +69,19 @@ enum dev_pm_opp_event {
 };
 
 #if defined(CONFIG_PM_OPP)
-struct device_opp *find_device_opp(struct device *dev);
+struct device_opp *_find_device_opp(struct device *dev);
 
 unsigned long dev_pm_opp_get_voltage(struct dev_pm_opp *opp);
 
 unsigned long dev_pm_opp_get_freq(struct dev_pm_opp *opp);
 
+bool dev_pm_opp_is_turbo(struct dev_pm_opp *opp);
+
 int dev_pm_opp_get_opp_count(struct device *dev);
+unsigned long dev_pm_opp_get_max_clock_latency(struct device *dev);
+unsigned long dev_pm_opp_get_max_volt_latency(struct device *dev);
+unsigned long dev_pm_opp_get_max_transition_latency(struct device *dev);
+struct dev_pm_opp *dev_pm_opp_get_suspend_opp(struct device *dev);
 
 struct dev_pm_opp *dev_pm_opp_find_freq_exact(struct device *dev,
 					      unsigned long freq,
@@ -72,6 +102,14 @@ int dev_pm_opp_enable(struct device *dev, unsigned long freq);
 int dev_pm_opp_disable(struct device *dev, unsigned long freq);
 
 struct srcu_notifier_head *dev_pm_opp_get_notifier(struct device *dev);
+int dev_pm_opp_set_supported_hw(struct device *dev, const u32 *versions,
+				unsigned int count);
+void dev_pm_opp_put_supported_hw(struct device *dev);
+int dev_pm_opp_set_prop_name(struct device *dev, const char *name);
+void dev_pm_opp_put_prop_name(struct device *dev);
+int dev_pm_opp_set_regulator(struct device *dev, const char *name);
+void dev_pm_opp_put_regulator(struct device *dev);
+int dev_pm_opp_set_rate(struct device *dev, unsigned long target_freq);
 #else
 static inline unsigned long dev_pm_opp_get_voltage(struct dev_pm_opp *opp)
 {
@@ -83,9 +121,34 @@ static inline unsigned long dev_pm_opp_get_freq(struct dev_pm_opp *opp)
 	return 0;
 }
 
+static inline bool dev_pm_opp_is_turbo(struct dev_pm_opp *opp)
+{
+	return false;
+}
+
 static inline int dev_pm_opp_get_opp_count(struct device *dev)
 {
 	return 0;
+}
+
+static inline unsigned long dev_pm_opp_get_max_clock_latency(struct device *dev)
+{
+	return 0;
+}
+
+static inline unsigned long dev_pm_opp_get_max_volt_latency(struct device *dev)
+{
+	return 0;
+}
+
+static inline unsigned long dev_pm_opp_get_max_transition_latency(struct device *dev)
+{
+	return 0;
+}
+
+static inline struct dev_pm_opp *dev_pm_opp_get_suspend_opp(struct device *dev)
+{
+	return NULL;
 }
 
 static inline struct dev_pm_opp *dev_pm_opp_find_freq_exact(struct device *dev,
@@ -131,19 +194,71 @@ static inline struct srcu_notifier_head *dev_pm_opp_get_notifier(
 {
 	return ERR_PTR(-EINVAL);
 }
-#endif		/* CONFIG_PM_OPP */
 
-#if defined(CONFIG_PM_OPP) && defined(CONFIG_OF)
-int of_init_opp_table(struct device *dev);
-void of_free_opp_table(struct device *dev);
-#else
-static inline int of_init_opp_table(struct device *dev)
+static inline int dev_pm_opp_set_supported_hw(struct device *dev,
+					      const u32 *versions,
+					      unsigned int count)
 {
 	return -EINVAL;
 }
 
-static inline void of_free_opp_table(struct device *dev)
+static inline void dev_pm_opp_put_supported_hw(struct device *dev) {}
+
+static inline int dev_pm_opp_set_prop_name(struct device *dev, const char *name)
 {
+	return -EINVAL;
+}
+
+static inline void dev_pm_opp_put_prop_name(struct device *dev) {}
+
+static inline int dev_pm_opp_set_regulator(struct device *dev, const char *name)
+{
+	return -EINVAL;
+}
+
+static inline void dev_pm_opp_put_regulator(struct device *dev) {}
+
+static inline int dev_pm_opp_set_rate(struct device *dev, unsigned long target_freq)
+{
+	return -EINVAL;
+}
+
+#endif		/* CONFIG_PM_OPP */
+
+#if defined(CONFIG_PM_OPP) && defined(CONFIG_OF)
+int dev_pm_opp_of_add_table(struct device *dev);
+void dev_pm_opp_of_remove_table(struct device *dev);
+int dev_pm_opp_of_cpumask_add_table(cpumask_var_t cpumask);
+void dev_pm_opp_of_cpumask_remove_table(cpumask_var_t cpumask);
+int dev_pm_opp_of_get_sharing_cpus(struct device *cpu_dev, cpumask_var_t cpumask);
+int dev_pm_opp_set_sharing_cpus(struct device *cpu_dev, cpumask_var_t cpumask);
+#else
+static inline int dev_pm_opp_of_add_table(struct device *dev)
+{
+	return -EINVAL;
+}
+
+static inline void dev_pm_opp_of_remove_table(struct device *dev)
+{
+}
+
+static inline int dev_pm_opp_of_cpumask_add_table(cpumask_var_t cpumask)
+{
+	return -ENOSYS;
+}
+
+static inline void dev_pm_opp_of_cpumask_remove_table(cpumask_var_t cpumask)
+{
+}
+
+static inline int dev_pm_opp_of_get_sharing_cpus(struct device *cpu_dev, cpumask_var_t cpumask)
+{
+	return -ENOSYS;
+}
+
+static inline int dev_pm_opp_set_sharing_cpus(struct device *cpu_dev, cpumask_var_t cpumask)
+{
+	return -ENOSYS;
 }
 #endif
 
