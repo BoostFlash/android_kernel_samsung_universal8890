@@ -422,11 +422,6 @@ static int __ref _cpu_down(unsigned int cpu, int tasks_frozen)
 	/* This actually kills the CPU. */
 	__cpu_die(cpu);
 
-#if defined(CONFIG_EXYNOS_BIG_FREQ_BOOST)
-	if (cpumask_test_cpu(cpu, &hmp_fast_cpu_mask))
-		cpus_notify_nofail(CPUS_DOWN_COMPLETE, (void *)cpu_online_mask);
-#endif
-
 	/* CPU is completely dead: tell everyone.  Too late to complain. */
 	cpu_notify_nofail(CPU_DEAD | mod, hcpu);
 
@@ -671,16 +666,6 @@ int cpu_up(unsigned int cpu)
 		err = -EBUSY;
 		goto out;
 	}
-
-#if defined(CONFIG_EXYNOS_BIG_FREQ_BOOST)
-	if (cpumask_test_cpu(cpu, &hmp_fast_cpu_mask)) {
-		cpumask_or(&dest_cpus, cpumask_of(cpu), cpu_online_mask);
-
-		err = cpus_notify(CPUS_UP_PREPARE, (void *)&dest_cpus);
-		if (err)
-			goto out;
-	}
-#endif
 
 	err = _cpu_up(cpu, 0);
 
