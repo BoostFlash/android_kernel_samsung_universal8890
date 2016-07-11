@@ -1906,18 +1906,8 @@ static void __sched_fork(unsigned long clone_flags, struct task_struct *p)
 	p->se.avg.usage_avg_sum = 0;
 	p->se.avg.remainder = 0;
 #ifdef CONFIG_SCHED_HMP
-	/* keep LOAD_AVG_MAX in sync with fair.c if load avg series is changed */
-#define LOAD_AVG_MAX 47742
 	p->se.avg.hmp_last_up_migration = 0;
 	p->se.avg.hmp_last_down_migration = 0;
-	if (hmp_task_should_forkboost(p)) {
-		p->se.avg.load_avg_ratio = 1023;
-		p->se.avg.load_avg_contrib =
-				(1023 * scale_load_down(p->se.load.weight));
-		p->se.avg.runnable_avg_period = LOAD_AVG_MAX;
-		p->se.avg.runnable_avg_sum = LOAD_AVG_MAX;
-		p->se.avg.usage_avg_sum = LOAD_AVG_MAX;
-	}
 #ifdef CONFIG_HP_EVENT_HMP_SYSTEM_LOAD
 	p->se.avg.is_big_thread = false;
 #endif
@@ -3453,7 +3443,7 @@ static void __setscheduler(struct rq *rq, struct task_struct *p,
 	else if (rt_prio(p->prio)) {
 		p->sched_class = &rt_sched_class;
 #ifdef CONFIG_SCHED_HMP
-		if (cpumask_equal(&p->cpus_allowed, cpu_possible_mask))
+		if (cpumask_equal(&p->cpus_allowed, cpu_all_mask))
 			do_set_cpus_allowed(p, &hmp_slow_cpu_mask);
 #endif
 	} else
